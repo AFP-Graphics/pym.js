@@ -1,4 +1,4 @@
-/*! pym.js - v0.4.4 - 2015-07-16 */
+/*! pym.js - v0.4.6 - 2015-10-12 */
 /*
 * Pym.js is library that resizes an iframe based on the width of the parent and the resulting height of the child.
 * Check out the docs at http://blog.apps.npr.org/pym.js/ or the readme at README.md for usage.
@@ -156,6 +156,9 @@
             // Calculate the width of this element.
             var width = this.el.offsetWidth.toString();
 
+            //Calculate the initial viewheight
+            var vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
             // Create an iframe element attached to the document.
             this.iframe = document.createElement('iframe');
 
@@ -179,13 +182,14 @@
             // Append the initial width as a querystring parameter, and the fragment id
             this.iframe.src = this.url +
                 'initialWidth=' + width +
+                '&initialVh=' + vh +
                 '&childId=' + this.id +
                 '&parentUrl=' + encodeURIComponent(window.location.href) +
                 hash;
 
             // Set some attributes to this proto-iframe.
             this.iframe.setAttribute('width', '100%');
-            this.iframe.setAttribute('scrolling', 'no');
+            // this.iframe.setAttribute('scrolling', 'no');
             this.iframe.setAttribute('marginheight', '0');
             this.iframe.setAttribute('frameborder', '0');
 
@@ -204,6 +208,7 @@
          */
         this._onResize = function() {
             this.sendWidth();
+            this.sendVh();
         }.bind(this);
 
         /**
@@ -286,6 +291,24 @@
             var height = parseInt(message);
 
             this.iframe.setAttribute('height', height + 'px');
+            this.iframe.style.overflow = 'none';
+        };
+
+        /**
+         * Resize iframe in response to new viewport height message from child.
+         *
+         * @memberof Parent.prototype
+         * @method _onVhHeightMessage
+         * @param {String} message The new height in a Vh percent.
+         */
+        this._onVhHeightMessage = function(message) {
+            /*
+             * Handle parent height message from child.
+             */
+            var vh = parseInt(message);
+
+            this.iframe.style.height = vh + 'vh';
+            this.iframe.style.overflow = 'auto';
         };
 
         /**
@@ -346,6 +369,17 @@
             this.sendMessage('width', width);
         };
 
+        /**
+         * Transmit the current page viewport height
+         * @memberof Parent.prototype
+         * @method sendVh
+         */
+        this.sendVh = function() {
+            var vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+            this.sendMessage('vh', vh);
+        };
+
         // Add any overrides to settings coming from config.
         for (var key in config) {
             this.settings[key] = config[key];
@@ -353,6 +387,7 @@
 
         // Bind required message handlers
         this.onMessage('height', this._onHeightMessage);
+        this.onMessage('heightVh', this._onVhHeightMessage);
         this.onMessage('navigateTo', this._onNavigateToMessage);
 
         // Add a listener for processing messages from the child.
@@ -378,7 +413,8 @@
         this.settings = {
             renderCallback: null,
             xdomain: '*',
-            polling: 0
+            polling: 0,
+            heightVh: null
         };
 
         this.messageRegex = null;
@@ -513,11 +549,16 @@
          * @method sendHeight
          */
         this.sendHeight = function() {
-            // Get the child's height.
-            var height = document.getElementsByTagName('body')[0].offsetHeight.toString();
+            if(this.settings.heightVh==null) {
+                // Get the child's height.
+                var height = document.getElementsByTagName('body')[0].offsetHeight.toString();
 
-            // Send the height to the parent.
-            this.sendMessage('height', height);
+                // Send the height to the parent.
+                this.sendMessage('height', height);
+            }
+            else {
+                this.sendMessage('heightVh', this.settings.heightVh);
+            }
         }.bind(this);
 
         /**
@@ -554,6 +595,9 @@
 
         // Bind the required message handlers
         this.onMessage('width', this._onWidthMessage);
+
+        // Get the initial viewport height from a URL parameter.
+        this.vh = parseInt(_getParameterByName('initialVh'));
 
         // Initialize settings with overrides.
         for (var key in config) {
