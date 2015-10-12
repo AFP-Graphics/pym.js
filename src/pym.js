@@ -184,7 +184,7 @@
 
             // Set some attributes to this proto-iframe.
             this.iframe.setAttribute('width', '100%');
-            this.iframe.setAttribute('scrolling', 'no');
+            // this.iframe.setAttribute('scrolling', 'no');
             this.iframe.setAttribute('marginheight', '0');
             this.iframe.setAttribute('frameborder', '0');
 
@@ -285,6 +285,24 @@
             var height = parseInt(message);
 
             this.iframe.setAttribute('height', height + 'px');
+            this.iframe.style.overflow = 'none';
+        };
+
+        /**
+         * Resize iframe in response to new viewport height message from child.
+         *
+         * @memberof Parent.prototype
+         * @method _onVhHeightMessage
+         * @param {String} message The new height in a Vh percent.
+         */
+        this._onVhHeightMessage = function(message) {
+            /*
+             * Handle parent height message from child.
+             */
+            var vh = parseInt(message);
+
+            this.iframe.style.height = vh + 'vh';
+            this.iframe.style.overflow = 'auto';
         };
 
         /**
@@ -352,6 +370,7 @@
 
         // Bind required message handlers
         this.onMessage('height', this._onHeightMessage);
+        this.onMessage('heightVh', this._onVhHeightMessage);
         this.onMessage('navigateTo', this._onNavigateToMessage);
 
         // Add a listener for processing messages from the child.
@@ -377,7 +396,8 @@
         this.settings = {
             renderCallback: null,
             xdomain: '*',
-            polling: 0
+            polling: 0,
+            heightVh: null
         };
 
         this.messageRegex = null;
@@ -512,11 +532,16 @@
          * @method sendHeight
          */
         this.sendHeight = function() {
-            // Get the child's height.
-            var height = document.getElementsByTagName('body')[0].offsetHeight.toString();
+            if(this.settings.heightVh==null) {
+                // Get the child's height.
+                var height = document.getElementsByTagName('body')[0].offsetHeight.toString();
 
-            // Send the height to the parent.
-            this.sendMessage('height', height);
+                // Send the height to the parent.
+                this.sendMessage('height', height);
+            }
+            else {
+                this.sendMessage('heightVh', this.settings.heightVh);
+            }
         }.bind(this);
 
         /**
