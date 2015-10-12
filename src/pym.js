@@ -155,6 +155,9 @@
             // Calculate the width of this element.
             var width = this.el.offsetWidth.toString();
 
+            //Calculate the initial viewheight
+            var vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
             // Create an iframe element attached to the document.
             this.iframe = document.createElement('iframe');
 
@@ -178,6 +181,7 @@
             // Append the initial width as a querystring parameter, and the fragment id
             this.iframe.src = this.url +
                 'initialWidth=' + width +
+                '&initialVh=' + vh +
                 '&childId=' + this.id +
                 '&parentUrl=' + encodeURIComponent(window.location.href) +
                 hash;
@@ -203,6 +207,7 @@
          */
         this._onResize = function() {
             this.sendWidth();
+            this.sendVh();
         }.bind(this);
 
         /**
@@ -343,6 +348,17 @@
             var width = this.el.offsetWidth.toString();
 
             this.sendMessage('width', width);
+        };
+
+        /**
+         * Transmit the current page viewport height
+         * @memberof Parent.prototype
+         * @method sendVh
+         */
+        this.sendVh = function() {
+            var vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+            this.sendMessage('vh', vh);
         };
 
         // Add any overrides to settings coming from config.
@@ -553,6 +569,9 @@
 
         // Bind the required message handlers
         this.onMessage('width', this._onWidthMessage);
+
+        // Get the initial viewport height from a URL parameter.
+        this.vh = parseInt(_getParameterByName('initialVh'));
 
         // Initialize settings with overrides.
         for (var key in config) {
