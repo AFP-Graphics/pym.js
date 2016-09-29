@@ -1,7 +1,7 @@
 /*
-* Pym.js is library that resizes an iframe based on the width of the parent and the resulting height of the child.
-* Check out the docs at http://blog.apps.npr.org/pym.js/ or the readme at README.md for usage.
-*/
+ * Pym.js is library that resizes an iframe based on the width of the parent and the resulting height of the child.
+ * Check out the docs at http://blog.apps.npr.org/pym.js/ or the readme at README.md for usage.
+ */
 
 /* global module */
 
@@ -19,12 +19,12 @@
     var lib = {};
 
     /**
-    * Generic function for parsing URL params.
-    * Via http://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
-    *
-    * @method _getParameterByName
-    * @param {String} name The name of the paramter to get from the URL.
-    */
+     * Generic function for parsing URL params.
+     * Via http://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
+     *
+     * @method _getParameterByName
+     * @param {String} name The name of the paramter to get from the URL.
+     */
     var _getParameterByName = function(name) {
         var regex = new RegExp("[\\?&]" + name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]') + '=([^&#]*)');
         var results = regex.exec(location.search);
@@ -47,7 +47,8 @@
     var _isSafeMessage = function(e, settings) {
         if (settings.xdomain !== '*') {
             // If origin doesn't match our xdomain, return.
-            if (!e.origin.match(new RegExp(settings.xdomain + '$'))) { return; }
+            if (!e.origin.match(new RegExp(settings.xdomain + '$'))) {
+                return; }
         }
 
         return true;
@@ -98,10 +99,10 @@
             var element = elements[idx];
 
             /*
-            * Mark automatically-initialized elements so they are not
-            * re-initialized if the user includes pym.js more than once in the
-            * same document.
-            */
+             * Mark automatically-initialized elements so they are not
+             * re-initialized if the user includes pym.js more than once in the
+             * same document.
+             */
             element.setAttribute('data-pym-auto-initialized', '');
 
             // Ensure elements have an id
@@ -114,7 +115,7 @@
             var config = {};
 
             if (xdomain) {
-               config.xdomain = xdomain;
+                config.xdomain = xdomain;
             }
 
             new lib.Parent(element.id, src, config);
@@ -221,7 +222,7 @@
         this._fire = function(messageType, message) {
             if (messageType in this.messageHandlers) {
                 for (var i = 0; i < this.messageHandlers[messageType].length; i++) {
-                   this.messageHandlers[messageType][i].call(this, message);
+                    this.messageHandlers[messageType][i].call(this, message);
                 }
             }
         };
@@ -321,7 +322,7 @@
             /*
              * Handle parent scroll message from child.
              */
-             document.location.href = message;
+            document.location.href = message;
         };
 
         /**
@@ -459,7 +460,7 @@
              */
             if (messageType in this.messageHandlers) {
                 for (var i = 0; i < this.messageHandlers[messageType].length; i++) {
-                   this.messageHandlers[messageType][i].call(this, message);
+                    this.messageHandlers[messageType][i].call(this, message);
                 }
             }
         };
@@ -473,8 +474,8 @@
          */
         this._processMessage = function(e) {
             /*
-            * Process a new message from parent frame.
-            */
+             * Process a new message from parent frame.
+             */
             // First, punt if this isn't from an acceptable xdomain.
             if (!_isSafeMessage(e, this.settings)) {
                 return;
@@ -489,7 +490,8 @@
             var match = e.data.match(this.messageRegex);
 
             // If there's no match or it's a bad format, punt.
-            if (!match || match.length !== 3) { return; }
+            if (!match || match.length !== 3) {
+                return; }
 
             var messageType = match[1];
             var message = match[2];
@@ -548,14 +550,13 @@
          * @method sendHeight
          */
         this.sendHeight = function() {
-            if(this.settings.heightVh==null) {
+            if (this.settings.heightVh == null) {
                 // Get the child's height.
                 var height = document.getElementsByTagName('body')[0].offsetHeight.toString();
 
                 // Send the height to the parent.
                 this.sendMessage('height', height);
-            }
-            else {
+            } else {
                 this.sendMessage('heightVh', this.settings.heightVh);
             }
         }.bind(this);
