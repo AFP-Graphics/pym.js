@@ -1,7 +1,7 @@
 /*
-* Pym.js is library that resizes an iframe based on the width of the parent and the resulting height of the child.
-* Check out the docs at http://blog.apps.npr.org/pym.js/ or the readme at README.md for usage.
-*/
+ * Pym.js is library that resizes an iframe based on the width of the parent and the resulting height of the child.
+ * Check out the docs at http://blog.apps.npr.org/pym.js/ or the readme at README.md for usage.
+ */
 
 /** @module pym */
 (function(factory) {
@@ -27,6 +27,7 @@
     *
     * @param {String} name The name of the paramter to get from the URL.
     */
+
     var _getParameterByName = function(name) {
         var regex = new RegExp("[\\?&]" + name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]') + '=([^&#]*)');
         var results = regex.exec(location.search);
@@ -51,7 +52,8 @@
     var _isSafeMessage = function(e, settings) {
         if (settings.xdomain !== '*') {
             // If origin doesn't match our xdomain, return.
-            if (!e.origin.match(new RegExp(settings.xdomain + '$'))) { return; }
+            if (!e.origin.match(new RegExp(settings.xdomain + '$'))) {
+                return; }
         }
 
         return true;
@@ -136,10 +138,10 @@
         for (var idx = 0; idx < length; ++idx) {
             var element = elements[idx];
             /*
-            * Mark automatically-initialized elements so they are not
-            * re-initialized if the user includes pym.js more than once in the
-            * same document.
-            */
+             * Mark automatically-initialized elements so they are not
+             * re-initialized if the user includes pym.js more than once in the
+             * same document.
+             */
             element.setAttribute('data-pym-auto-initialized', '');
 
             // Ensure elements have an id
@@ -273,6 +275,9 @@
             // Calculate the width of this element.
             var width = this.el.offsetWidth.toString();
 
+            //Calculate the initial viewheight
+            var vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
             // Create an iframe element attached to the document.
             this.iframe = document.createElement('iframe');
 
@@ -296,6 +301,7 @@
             // Append the initial width as a querystring parameter, and the fragment id
             this.iframe.src = this.url +
                 'initialWidth=' + width +
+                '&initialVh=' + vh +
                 '&childId=' + this.id +
                 '&parentTitle=' + encodeURIComponent(document.title) +
                 '&parentUrl=' + encodeURIComponent(window.location.href) +
@@ -303,7 +309,7 @@
 
             // Set some attributes to this proto-iframe.
             this.iframe.setAttribute('width', '100%');
-            this.iframe.setAttribute('scrolling', 'no');
+            // this.iframe.setAttribute('scrolling', 'no');
             this.iframe.setAttribute('marginheight', '0');
             this.iframe.setAttribute('frameborder', '0');
 
@@ -348,6 +354,7 @@
          */
         this._onResize = function() {
             this.sendWidth();
+            this.sendVh();
         }.bind(this);
 
         /**
@@ -363,7 +370,7 @@
         this._fire = function(messageType, message) {
             if (messageType in this.messageHandlers) {
                 for (var i = 0; i < this.messageHandlers[messageType].length; i++) {
-                   this.messageHandlers[messageType][i].call(this, message);
+                    this.messageHandlers[messageType][i].call(this, message);
                 }
             }
         };
@@ -434,6 +441,24 @@
             var height = parseInt(message);
 
             this.iframe.setAttribute('height', height + 'px');
+            this.iframe.style.overflow = 'none';
+        };
+
+        /**
+         * Resize iframe in response to new viewport height message from child.
+         *
+         * @memberof Parent.prototype
+         * @method _onVhHeightMessage
+         * @param {String} message The new height in a Vh percent.
+         */
+        this._onVhHeightMessage = function(message) {
+            /*
+             * Handle parent height message from child.
+             */
+            var vh = parseInt(message);
+
+            this.iframe.style.height = vh + 'vh';
+            this.iframe.style.overflow = 'auto';
         };
 
         /**
@@ -533,6 +558,17 @@
             this.sendMessage('width', width);
         };
 
+        /**
+         * Transmit the current page viewport height
+         * @memberof Parent.prototype
+         * @method sendVh
+         */
+        this.sendVh = function() {
+            var vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+
+            this.sendMessage('vh', vh);
+        };
+
         // Add any overrides to settings coming from config.
         for (var key in config) {
             this.settings[key] = config[key];
@@ -540,6 +576,7 @@
 
         // Bind required message handlers
         this.onMessage('height', this._onHeightMessage);
+        this.onMessage('heightVh', this._onVhHeightMessage);
         this.onMessage('navigateTo', this._onNavigateToMessage);
         this.onMessage('scrollToChildPos', this._onScrollToChildPosMessage);
 
@@ -607,7 +644,8 @@
         this.settings = {
             renderCallback: null,
             xdomain: '*',
-            polling: 0
+            polling: 0,
+            heightVh: null
         };
 
         /**
@@ -681,7 +719,7 @@
              */
             if (messageType in this.messageHandlers) {
                 for (var i = 0; i < this.messageHandlers[messageType].length; i++) {
-                   this.messageHandlers[messageType][i].call(this, message);
+                    this.messageHandlers[messageType][i].call(this, message);
                 }
             }
         };
@@ -697,8 +735,8 @@
          */
         this._processMessage = function(e) {
             /*
-            * Process a new message from parent frame.
-            */
+             * Process a new message from parent frame.
+             */
             // First, punt if this isn't from an acceptable xdomain.
             if (!_isSafeMessage(e, this.settings)) {
                 return;
@@ -713,7 +751,8 @@
             var match = e.data.match(this.messageRegex);
 
             // If there's no match or it's a bad format, punt.
-            if (!match || match.length !== 3) { return; }
+            if (!match || match.length !== 3) {
+                return; }
 
             var messageType = match[1];
             var message = match[2];
@@ -777,8 +816,9 @@
          * @instance
          */
         this.sendHeight = function() {
-            // Get the child's height.
-            var height = document.getElementsByTagName('body')[0].offsetHeight.toString();
+            if (this.settings.heightVh == null) {
+                // Get the child's height.
+                var height = document.getElementsByTagName('body')[0].offsetHeight.toString();
 
             // Send the height to the parent.
             this.sendMessage('height', height);
@@ -906,6 +946,9 @@
 
         // Bind the required message handlers
         this.onMessage('width', this._onWidthMessage);
+
+        // Get the initial viewport height from a URL parameter.
+        this.vh = parseInt(_getParameterByName('initialVh'));
 
         // Initialize settings with overrides.
         for (var key in config) {
