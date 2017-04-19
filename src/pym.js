@@ -1,7 +1,7 @@
 /*
- * Pym.js is library that resizes an iframe based on the width of the parent and the resulting height of the child.
- * Check out the docs at http://blog.apps.npr.org/pym.js/ or the readme at README.md for usage.
- */
+* Pym.js is library that resizes an iframe based on the width of the parent and the resulting height of the child.
+* Check out the docs at http://blog.apps.npr.org/pym.js/ or the readme at README.md for usage.
+*/
 
 /** @module pym */
 (function(factory) {
@@ -19,6 +19,20 @@
     var lib = {};
 
     /**
+    * Create and dispatch a custom pym event
+    *
+    * @method _raiseCustomEvent
+    * @inner
+    *
+    * @param {String} eventName
+    */
+   var _raiseCustomEvent = function(eventName) {
+     var event = document.createEvent('Event');
+     event.initEvent('pym:' + eventName, true, true);
+     document.dispatchEvent(event);
+   };
+
+    /**
     * Generic function for parsing URL params.
     * Via http://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
     *
@@ -27,7 +41,6 @@
     *
     * @param {String} name The name of the paramter to get from the URL.
     */
-
     var _getParameterByName = function(name) {
         var regex = new RegExp("[\\?&]" + name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]') + '=([^&#]*)');
         var results = regex.exec(location.search);
@@ -52,8 +65,7 @@
     var _isSafeMessage = function(e, settings) {
         if (settings.xdomain !== '*') {
             // If origin doesn't match our xdomain, return.
-            if (!e.origin.match(new RegExp(settings.xdomain + '$'))) {
-                return; }
+            if (!e.origin.match(new RegExp(settings.xdomain + '$'))) { return; }
         }
 
         return true;
@@ -128,8 +140,9 @@
      * Expose autoinit in case we need to call it from the outside
      * @instance
      * @method autoInit
+     * @param {Boolean} doNotRaiseEvents flag to avoid sending custom events
      */
-    lib.autoInit = function() {
+    lib.autoInit = function(doNotRaiseEvents) {
         var elements = document.querySelectorAll('[data-pym-src]:not([data-pym-auto-initialized])');
         var length = elements.length;
 
@@ -138,10 +151,10 @@
         for (var idx = 0; idx < length; ++idx) {
             var element = elements[idx];
             /*
-             * Mark automatically-initialized elements so they are not
-             * re-initialized if the user includes pym.js more than once in the
-             * same document.
-             */
+            * Mark automatically-initialized elements so they are not
+            * re-initialized if the user includes pym.js more than once in the
+            * same document.
+            */
             element.setAttribute('data-pym-auto-initialized', '');
 
             // Ensure elements have an id
@@ -154,7 +167,9 @@
             // List of data attributes to configure the component
             // structure: {'attribute name': 'type'}
             var settings = {'xdomain': 'string', 'title': 'string', 'name': 'string', 'id': 'string',
-                              'sandbox': 'string', 'allowfullscreen': 'boolean'};
+                            'sandbox': 'string', 'allowfullscreen': 'boolean',
+                            'parenturlparam': 'string', 'parenturlvalue': 'string',
+                            'optionalparams': 'boolean'};
 
             var config = {};
 
@@ -179,6 +194,10 @@
             lib.autoInitInstances.push(parent);
         }
 
+        // Fire customEvent
+        if (!doNotRaiseEvents) {
+            _raiseCustomEvent("pym-initialized");
+        }
         // Return stored autoinitalized pym instances
         return lib.autoInitInstances;
     };
@@ -197,6 +216,9 @@
      * @param {string} [config.id] - if passed it will be assigned to the iframe id attribute
      * @param {boolean} [config.allowfullscreen] - if passed and different than false it will be assigned to the iframe allowfullscreen attribute
      * @param {string} [config.sandbox] - if passed it will be assigned to the iframe sandbox attribute (we do not validate the syntax so be careful!!)
+     * @param {string} [config.parenturlparam] - if passed it will be override the default parentUrl query string parameter name passed to the iframe src
+     * @param {string} [config.parenturlvalue] - if passed it will be override the default parentUrl query string parameter value passed to the iframe src
+     * @param {string} [config.optionalparams] - if passed and different than false it will strip the querystring params parentUrl and parentTitle passed to the iframe src
      * @see {@link https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe iFrame}
      */
     lib.Parent = function(id, url, config) {
@@ -242,7 +264,10 @@
          * @inner
          */
         this.settings = {
-            xdomain: '*'
+            xdomain: '*',
+            optionalparams: true,
+            parenturlparam: 'parentUrl',
+            parenturlvalue: window.location.href
         };
         /**
          * RegularExpression to validate the received messages
@@ -275,9 +300,6 @@
             // Calculate the width of this element.
             var width = this.el.offsetWidth.toString();
 
-            //Calculate the initial viewheight
-            var vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
-
             // Create an iframe element attached to the document.
             this.iframe = document.createElement('iframe');
 
@@ -298,18 +320,20 @@
                 this.url += '&';
             }
 
-            // Append the initial width as a querystring parameter, and the fragment id
-            this.iframe.src = this.url +
-                'initialWidth=' + width +
-                '&initialVh=' + vh +
-                '&childId=' + this.id +
-                '&parentTitle=' + encodeURIComponent(document.title) +
-                '&parentUrl=' + encodeURIComponent(window.location.href) +
-                hash;
+            // Append the initial width as a querystring parameter
+            // and optional params if configured to do so
+            this.iframe.src = this.url + 'initialWidth=' + width +
+                                         '&childId=' + this.id;
+
+            if (this.settings.optionalparams) {
+                this.iframe.src += '&parentTitle=' + encodeURIComponent(document.title);
+                this.iframe.src += '&'+ this.settings.parenturlparam + '=' + encodeURIComponent(this.settings.parenturlvalue);
+            }
+            this.iframe.src +=hash;
 
             // Set some attributes to this proto-iframe.
             this.iframe.setAttribute('width', '100%');
-            // this.iframe.setAttribute('scrolling', 'no');
+            this.iframe.setAttribute('scrolling', 'no');
             this.iframe.setAttribute('marginheight', '0');
             this.iframe.setAttribute('frameborder', '0');
 
@@ -354,7 +378,6 @@
          */
         this._onResize = function() {
             this.sendWidth();
-            this.sendVh();
         }.bind(this);
 
         /**
@@ -370,7 +393,7 @@
         this._fire = function(messageType, message) {
             if (messageType in this.messageHandlers) {
                 for (var i = 0; i < this.messageHandlers[messageType].length; i++) {
-                    this.messageHandlers[messageType][i].call(this, message);
+                   this.messageHandlers[messageType][i].call(this, message);
                 }
             }
         };
@@ -441,24 +464,6 @@
             var height = parseInt(message);
 
             this.iframe.setAttribute('height', height + 'px');
-            this.iframe.style.overflow = 'none';
-        };
-
-        /**
-         * Resize iframe in response to new viewport height message from child.
-         *
-         * @memberof Parent.prototype
-         * @method _onVhHeightMessage
-         * @param {String} message The new height in a Vh percent.
-         */
-        this._onVhHeightMessage = function(message) {
-            /*
-             * Handle parent height message from child.
-             */
-            var vh = parseInt(message);
-
-            this.iframe.style.height = vh + 'vh';
-            this.iframe.style.overflow = 'auto';
         };
 
         /**
@@ -558,17 +563,6 @@
             this.sendMessage('width', width);
         };
 
-        /**
-         * Transmit the current page viewport height
-         * @memberof Parent.prototype
-         * @method sendVh
-         */
-        this.sendVh = function() {
-            var vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
-
-            this.sendMessage('vh', vh);
-        };
-
         // Add any overrides to settings coming from config.
         for (var key in config) {
             this.settings[key] = config[key];
@@ -576,7 +570,6 @@
 
         // Bind required message handlers
         this.onMessage('height', this._onHeightMessage);
-        this.onMessage('heightVh', this._onVhHeightMessage);
         this.onMessage('navigateTo', this._onNavigateToMessage);
         this.onMessage('scrollToChildPos', this._onScrollToChildPosMessage);
 
@@ -599,6 +592,7 @@
      * @param {string} [config.xdomain='*'] - xdomain to validate messages received
      * @param {number} [config.polling=0] - polling frequency in milliseconds to send height to parent
      * @param {number} [config.id] - parent container id used when navigating the child iframe to a new page but we want to keep it responsive.
+     * @param {string} [config.parenturlparam] - if passed it will be override the default parentUrl query string parameter name expected on the iframe src
      */
     lib.Child = function(config) {
         /**
@@ -645,7 +639,7 @@
             renderCallback: null,
             xdomain: '*',
             polling: 0,
-            heightVh: null
+            parenturlparam: 'parentUrl'
         };
 
         /**
@@ -719,7 +713,7 @@
              */
             if (messageType in this.messageHandlers) {
                 for (var i = 0; i < this.messageHandlers[messageType].length; i++) {
-                    this.messageHandlers[messageType][i].call(this, message);
+                   this.messageHandlers[messageType][i].call(this, message);
                 }
             }
         };
@@ -735,8 +729,8 @@
          */
         this._processMessage = function(e) {
             /*
-             * Process a new message from parent frame.
-             */
+            * Process a new message from parent frame.
+            */
             // First, punt if this isn't from an acceptable xdomain.
             if (!_isSafeMessage(e, this.settings)) {
                 return;
@@ -751,8 +745,7 @@
             var match = e.data.match(this.messageRegex);
 
             // If there's no match or it's a bad format, punt.
-            if (!match || match.length !== 3) {
-                return; }
+            if (!match || match.length !== 3) { return; }
 
             var messageType = match[1];
             var message = match[2];
@@ -816,9 +809,8 @@
          * @instance
          */
         this.sendHeight = function() {
-            if (this.settings.heightVh == null) {
-                // Get the child's height.
-                var height = document.getElementsByTagName('body')[0].offsetHeight.toString();
+            // Get the child's height.
+            var height = document.getElementsByTagName('body')[0].offsetHeight.toString();
 
             // Send the height to the parent.
             this.sendMessage('height', height);
@@ -891,7 +883,7 @@
          *
          * @param {module:pym.Child~onMarkedEmbeddedStatus} The callback to execute after determining whether embedded or not.
          */
-        this._markWhetherEmbedded = function(onMarkedEmbeddedStatus) {
+        var _markWhetherEmbedded = function(onMarkedEmbeddedStatus) {
           var htmlElement = document.getElementsByTagName('html')[0],
               newClassForHtml,
               originalHtmlClasses = htmlElement.className;
@@ -909,6 +901,7 @@
             if(onMarkedEmbeddedStatus){
               onMarkedEmbeddedStatus(newClassForHtml);
             }
+            _raiseCustomEvent("marked-embedded");
           }
         };
 
@@ -931,6 +924,11 @@
             }
         };
 
+        // Initialize settings with overrides.
+        for (var key in config) {
+            this.settings[key] = config[key];
+        }
+
         // Identify what ID the parent knows this child as.
         this.id = _getParameterByName('childId') || config.id;
         this.messageRegex = new RegExp('^pym' + MESSAGE_DELIMITER + this.id + MESSAGE_DELIMITER + '(\\S+)' + MESSAGE_DELIMITER + '(.*)$');
@@ -939,21 +937,13 @@
         var width = parseInt(_getParameterByName('initialWidth'));
 
         // Get the url of the parent frame
-        this.parentUrl = _getParameterByName('parentUrl');
+        this.parentUrl = _getParameterByName(this.settings.parenturlparam);
 
         // Get the title of the parent frame
         this.parentTitle = _getParameterByName('parentTitle');
 
         // Bind the required message handlers
         this.onMessage('width', this._onWidthMessage);
-
-        // Get the initial viewport height from a URL parameter.
-        this.vh = parseInt(_getParameterByName('initialVh'));
-
-        // Initialize settings with overrides.
-        for (var key in config) {
-            this.settings[key] = config[key];
-        }
 
         // Set up a listener to handle any incoming messages.
         window.addEventListener('message', this._processMessage, false);
@@ -971,14 +961,17 @@
             this.timerId = window.setInterval(this.sendHeight, this.settings.polling);
         }
 
-        this._markWhetherEmbedded(config.onMarkedEmbeddedStatus);
+        _markWhetherEmbedded(config.onMarkedEmbeddedStatus);
 
         return this;
     };
 
     // @ifdef AUTOINIT
     // Initialize elements with pym data attributes
-    lib.autoInit();
+    // if we are not in server configuration
+    if(typeof document !== "undefined") {
+        lib.autoInit(true);
+    }
     // @endif
 
     return lib;
